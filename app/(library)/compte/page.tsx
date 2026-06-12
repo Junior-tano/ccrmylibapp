@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -92,18 +92,34 @@ const DELIVERY_STEPS = [
 
 function CompteContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const tabParam = searchParams.get("tab")
+  const sectionParam = searchParams.get("section") as "profile" | "orders" | "ebooks" | null
+  const [activeSection, setActiveSection] = useState<"profile" | "orders" | "ebooks">(
+    sectionParam ?? "orders"
+  )
   const storeOrders = useStore((state) => state.orders)
   const storeEbookOrders = useStore((state) => state.ebookOrders)
   const loadOrders = useStore((state) => state.loadOrders)
   const loadEbookOrders = useStore((state) => state.loadEbookOrders)
   
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<UserData | null>(() => {
+    if (typeof window === "undefined") return null
+    const saved = localStorage.getItem("user")
+    return saved ? JSON.parse(saved) : null
+  })
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    return !!localStorage.getItem("user")
+  })
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true
+    // Si on a déjà un user en localStorage, pas besoin d'afficher le loader
+    return false
+  })
   const [activeTab, setActiveTab] = useState<"login" | "register">(
     tabParam === "register" ? "register" : "login"
   )
-  const [user, setUser] = useState<UserData | null>(null)
   const [orders, setOrders] = useState<OrderHistory[]>([])
   const [ebookOrders, setEbookOrders] = useState<EbookOrderHistory[]>([])
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
@@ -139,11 +155,8 @@ function CompteContent() {
   }, [tabParam])
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-      setIsLoggedIn(true)
-    }
+    // L'état user/isLoggedIn est déjà initialisé depuis localStorage via lazy useState
+    // On marque juste le chargement comme terminé
     setIsLoading(false)
   }, [])
 
@@ -356,7 +369,11 @@ function CompteContent() {
               </Button>
             </div>
 
-            <Tabs defaultValue="profile" className="space-y-6">
+            <Tabs value={activeSection} onValueChange={(v) => {
+                const section = v as "profile" | "orders" | "ebooks"
+                setActiveSection(section)
+                router.replace(`/compte?section=${section}`, { scroll: false })
+              }} className="space-y-6">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="profile" className="gap-2">
                   <User className="h-4 w-4" />
